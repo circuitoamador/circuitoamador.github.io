@@ -1,0 +1,51 @@
+name: Publicar Circuito Amador Web
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: circuitoamador/circuito-amador-privacidade
+          ref: main
+          persist-credentials: false
+      - uses: actions/configure-pages@v5
+      - name: Preparar o app para /app/
+        run: |
+          mkdir -p _site
+          cp -R app _site/app
+          python3 - <<'PY'
+          from pathlib import Path
+
+          for path in Path("_site/app").rglob("*"):
+              if path.suffix in {".html", ".js", ".json"}:
+                  source = path.read_text(encoding="utf-8")
+                  updated = source.replace("/circuito-amador-privacidade/app", "/app")
+                  updated = updated.replace(
+                      "https://simaodiaszueiro.github.io/circuito-amador-privacidade/",
+                      "https://circuitoamador.github.io/circuito-amador-privacidade/",
+                  )
+                  if updated != source:
+                      path.write_text(updated, encoding="utf-8")
+          PY
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - uses: actions/deploy-pages@v4
+        id: deployment
